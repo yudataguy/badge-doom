@@ -96,13 +96,14 @@ void I_GetEvent(void)
     uint32_t current_buttons = badger_read_buttons();
 
     // Tufty badge mapping:
-    // A=left, B=fire/select, C=right, UP/DOWN=forward/back, HOME=escape.
+    // A=left, B=right, C=fire/use/select, UP/DOWN=forward/back, HOME=escape.
     sync_button(current_buttons, BADGER_BUTTON_UP, KEY_UPARROW);
     sync_button(current_buttons, BADGER_BUTTON_DOWN, KEY_DOWNARROW);
     sync_button(current_buttons, BADGER_BUTTON_A, KEY_LEFTARROW);
-    sync_button(current_buttons, BADGER_BUTTON_B, KEY_RCTRL);
-    sync_button(current_buttons, BADGER_BUTTON_B, KEY_ENTER);
-    sync_button(current_buttons, BADGER_BUTTON_C, KEY_RIGHTARROW);
+    sync_button(current_buttons, BADGER_BUTTON_B, KEY_RIGHTARROW);
+    sync_button(current_buttons, BADGER_BUTTON_C, KEY_RCTRL);
+    sync_button(current_buttons, BADGER_BUTTON_C, ' ');
+    sync_button(current_buttons, BADGER_BUTTON_C, KEY_ENTER);
     sync_button(current_buttons, BADGER_BUTTON_HOME, KEY_ESCAPE);
 
     previous_buttons = current_buttons;

@@ -101,11 +101,11 @@ sequence in `badger_hw_tufty.c` handles this automatically.
 | UP | 10 | Move forward |
 | DOWN | 6 | Move backward |
 | A | 7 | Turn left |
-| B | 8 | Fire + menu select |
-| C | 9 | Turn right |
+| B | 8 | Turn right |
+| C | 9 | Fire + menu select |
 | HOME | 22 | Escape / menu |
 
-Button B sends both `KEY_RCTRL` (fire) and `KEY_ENTER` (menu select) simultaneously, so it works as the action
+Button C sends both `KEY_RCTRL` (fire) and `KEY_ENTER` (menu select) simultaneously, so it works as the action
 button in both gameplay and menus.
 
 ## Architecture
