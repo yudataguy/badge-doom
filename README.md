@@ -1,7 +1,7 @@
 # Doom on the GitHub Universe 2025 Badge
 
 This fork runs the full shareware Doom (DOOM1.WAD) on the **GitHub Universe 2025 conference badge**, a custom
-[Pimoroni Tufty 2350](https://github.com/pimoroni/tufty2350) with an RP2350B processor, 16 MB flash, and a 320x240
+[Pimoroni Tufty 2350](https://github.com/pimoroni/tufty2350) with a RP2350B processor, 16 MB flash, and a 320x240
 ST7789 LCD. Six buttons, no keyboard, no VGA, no audio.
 
 <p align="center">
