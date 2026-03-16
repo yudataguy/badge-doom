@@ -469,29 +469,29 @@ if (TARGET chocolate-doom)
     )
 endif()
 
-function(add_doom_tiny SUFFIX RENDER_LIB)
-    add_executable(doom_tiny${SUFFIX})
-    target_link_libraries(doom_tiny${SUFFIX} PRIVATE game)
+function(add_doom_tiny_target TARGET_NAME RENDER_LIB BACKEND_LIB)
+    add_executable(${TARGET_NAME})
+    target_link_libraries(${TARGET_NAME} PRIVATE game)
 
-    target_sources(doom_tiny${SUFFIX} PRIVATE
+    target_sources(${TARGET_NAME} PRIVATE
             tiny_huff.c
             musx_decoder.c
             image_decoder.c
             )
-    target_include_directories(doom_tiny${SUFFIX} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../")
-    target_link_libraries(doom_tiny${SUFFIX} PRIVATE doom ${EXTRA_LIBS})
+    target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../")
+    target_link_libraries(${TARGET_NAME} PRIVATE doom ${EXTRA_LIBS} ${BACKEND_LIB})
 
-    target_link_libraries(doom_tiny${SUFFIX} PRIVATE small_doom_common)
+    target_link_libraries(${TARGET_NAME} PRIVATE small_doom_common)
 
     if (PICO_SDK)
-        pico_set_float_implementation(doom_tiny${SUFFIX} none)
-        pico_set_double_implementation(doom_tiny${SUFFIX} none)
-        pico_add_extra_outputs(doom_tiny${SUFFIX})
+        pico_set_float_implementation(${TARGET_NAME} none)
+        pico_set_double_implementation(${TARGET_NAME} none)
+        pico_add_extra_outputs(${TARGET_NAME})
     endif()
 
-    target_compile_options(doom_tiny${SUFFIX} PRIVATE
+    target_compile_options(${TARGET_NAME} PRIVATE
             -Wno-format-truncation)
-    target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
+    target_compile_definitions(${TARGET_NAME} PRIVATE
         DOOM_TINY=1
         EMU8950_SLOT_RENDER=1
 
@@ -502,7 +502,6 @@ function(add_doom_tiny SUFFIX RENDER_LIB)
         # SDK minimilization
         PICO_TIME_DEFAULT_ALARM_POOL_DISABLED=1
         PICO_TIME_DEFAULT_ALARM_POOL_MAX_TIMERS=1
-        PICO_DISABLE_SHARED_IRQ_HANDLERS=1
         PICO_USE_OPTIMISTIC_SBRK=1
 
         # MUSIC
@@ -510,11 +509,6 @@ function(add_doom_tiny SUFFIX RENDER_LIB)
         USE_DIRECT_MIDI_LUMP=1
 
         NO_USE_NET=1 # standard networking
-        USE_PICO_NET=1
-        # for vgaboard
-        PICO_DEFAULT_I2C=1
-        PICO_DEFAULT_I2C_SDA_PIN=18
-        PICO_DEFAULT_I2C_SCL_PIN=19
 
         #NO_USE_LOAD=1
         #NO_USE_SAVE=1
@@ -560,7 +554,7 @@ function(add_doom_tiny SUFFIX RENDER_LIB)
 
 #        PICO_DOOM_INFO=1
     )
-    target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
+    target_compile_definitions(${TARGET_NAME} PRIVATE
         #FORCE_NODRAW=1
         USE_MEMORY_WAD=1
         PICO_DEBUG_MALLOC=1
@@ -571,33 +565,33 @@ function(add_doom_tiny SUFFIX RENDER_LIB)
         NO_IERROR=1
     )
     if (PICO_ON_DEVICE)
-        target_compile_options(doom_tiny${SUFFIX} PRIVATE -fno-common -fdata-sections -Wl,--sort-section=alignment)
-        target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
+        target_compile_options(${TARGET_NAME} PRIVATE -fno-common -fdata-sections -Wl,--sort-section=alignment)
+        target_compile_definitions(${TARGET_NAME} PRIVATE
                 NO_ZONE_DEBUG=1
                 )
-        #target_link_libraries(doom_tiny${SUFFIX} PRIVATE hardware_flash)
+        #target_link_libraries(${TARGET_NAME} PRIVATE hardware_flash)
     endif()
     if (FORCE_DEBUG)
-        target_compile_options(doom_tiny${SUFFIX} PRIVATE -g)
+        target_compile_options(${TARGET_NAME} PRIVATE -g)
     endif()
-    target_link_libraries(doom_tiny${SUFFIX} PRIVATE ${RENDER_LIB})
+    target_link_libraries(${TARGET_NAME} PRIVATE ${RENDER_LIB})
     set(PICO_HACK 0)
     set(STAMP_HACK 0)
     if (PICO_HACK)
-        target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
+        target_compile_definitions(${TARGET_NAME} PRIVATE
                 PICO_AUDIO_I2S_DATA_PIN=20
                 PICO_AUDIO_I2S_CLOCK_PIN_BASE=21
                 NO_USE_UART=1
                 )
-        pico_enable_stdio_uart(doom_tiny${SUFFIX} 0)
+        pico_enable_stdio_uart(${TARGET_NAME} 0)
     elseif(STAMP_HACK)
-        target_compile_definitions(doom_tiny${SUFFIX} PRIVATE
+        target_compile_definitions(${TARGET_NAME} PRIVATE
                 PICO_AUDIO_I2S_DATA_PIN=22
                 PICO_AUDIO_I2S_CLOCK_PIN_BASE=23
                 NO_USE_UART=1
                 INCREASE_I2S_DRIVE_STRENGTH=1
         )
-        pico_enable_stdio_uart(doom_tiny${SUFFIX} 0)
+        pico_enable_stdio_uart(${TARGET_NAME} 0)
     endif()
 endfunction()
 
@@ -627,7 +621,7 @@ else()
 endif()
 
 if (PICO_SDK)
-    add_doom_tiny("" render_newhope)
+    add_doom_tiny_target(doom_tiny render_newhope pico_backend_vga)
     add_library(tiny_settings INTERFACE)
     target_compile_definitions(tiny_settings INTERFACE
             WHD_SUPER_TINY=1
@@ -639,7 +633,7 @@ if (PICO_SDK)
             TINY_WAD_ADDR=0x10040000
     )
     target_link_libraries(doom_tiny PRIVATE tiny_settings)
-    add_doom_tiny(_nost render_newhope)
+    add_doom_tiny_target(doom_tiny_nost render_newhope pico_backend_vga)
 
     target_compile_definitions(doom_tiny_nost PRIVATE
             # NO_USE_FINALE_CAST=1 # note this is only used by doom II but doesnt take that much more space
@@ -647,19 +641,25 @@ if (PICO_SDK)
             )
     if (PICO_ON_DEVICE)
         suppress_tinyusb_warnings()
-        add_doom_tiny(_usb render_newhope)
+        add_doom_tiny_target(doom_tiny_usb render_newhope pico_backend_vga)
         target_link_libraries(doom_tiny_usb PRIVATE tiny_settings pico_cd)
         target_compile_definitions(doom_tiny_usb PRIVATE
                 USB_SUPPORT=1
                 TINY_WAD_ADDR=0x10042000 # ugh tinyusb is >8K currently!!
         )
-        add_doom_tiny(_nost_usb render_newhope)
+        add_doom_tiny_target(doom_tiny_nost_usb render_newhope pico_backend_vga)
         target_link_libraries(doom_tiny_nost_usb PRIVATE pico_cd)
         target_compile_definitions(doom_tiny_nost_usb PRIVATE
                 USB_SUPPORT=1
                 TINY_WAD_ADDR=0x10048000
                 )
+
+        add_doom_tiny_target(doom_tufty_badger_scaffold render_newhope pico_backend_badger_scaffold)
+        target_link_libraries(doom_tufty_badger_scaffold PRIVATE tiny_settings)
+        target_compile_definitions(doom_tufty_badger_scaffold PRIVATE
+                PICO_DOOM_TUFTY_BADGER=1
+                PICO_BADGER_NO_AUDIO=1
+                TINY_WAD_ADDR=0x10040000
+        )
     endif()
 endif()
-
-

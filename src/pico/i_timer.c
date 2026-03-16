@@ -29,7 +29,10 @@
 
 int  I_GetTime (void)
 {
-    return TICRATE * (uint32_t)(time_us_64() / 1000);
+    // Convert milliseconds to tics at TICRATE (35) per second.
+    // 150323855 ≈ (35 << 32) / 1000, matching GetAdjustedTime() in d_loop.c.
+    uint64_t v = 150323855ull * (uint32_t)(time_us_64() / 1000);
+    return (int)(v >> 32);
 }
 
 //

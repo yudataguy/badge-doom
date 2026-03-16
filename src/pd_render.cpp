@@ -2626,6 +2626,21 @@ void pd_end_frame(int wipe_start) {
 
     DEBUG_PINS_SET(full_render, 1);
 
+#if PICO_DOOM_TUFTY_BADGER
+    // The Tufty badge LCD backend does not implement the VGA scanline-driven
+    // melt effect machinery, and running the tiny-port wipe state machine here
+    // can trap the main loop on the first title/demo transition. Skip wipes on
+    // this target and keep the normal single/double-buffer presentation modes.
+    if (wipe_start || wipestate) {
+        wipe_start = 0;
+        wipestate = WIPESTATE_NONE;
+        wipe_min = 200;
+        next_video_type = showing_help ? VIDEO_TYPE_SINGLE
+                                       : (gamestate == GS_LEVEL ? VIDEO_TYPE_DOUBLE : VIDEO_TYPE_SINGLE);
+        post_wipecount = 0;
+    }
+#endif
+
     uint8_t *list_buffer_limit = list_buffer + count_of(list_buffer);
     if (!inhelpscreens) {
         if (was_in_help) {

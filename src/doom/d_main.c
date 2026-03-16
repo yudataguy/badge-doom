@@ -85,6 +85,19 @@
 #include "tusb.h"
 #endif
 #endif
+// Debug helper: show a solid color on the badge LCD
+#if PICO_DOOM_TUFTY_BADGER
+static void tufty_show_color(uint16_t rgb565) {
+    extern void badger_lcd_present_565(const uint16_t *, int, int);
+    static uint16_t color_fb[160 * 120];
+    for (int i = 0; i < 160 * 120; i++) color_fb[i] = rgb565;
+    badger_lcd_present_565(color_fb, 160, 120);
+}
+#define TUFTY_MILESTONE(color) tufty_show_color(color)
+#else
+#define TUFTY_MILESTONE(color)
+#endif
+
 //
 // D-DoomLoop()
 // Not a globally visible function,
@@ -513,6 +526,7 @@ void D_RunFrame()
         do {
             D_Display();
         } while (wipestate);
+        I_FinishUpdate();
 #endif
     }
 }

@@ -51,7 +51,7 @@
 
 void D_DoomMain (void);
 
-#if PICO_ON_DEVICE
+#if PICO_ON_DEVICE && !PICO_BADGER_NO_AUDIO
 #include "pico/binary_info.h"
 bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_CLOCK_PIN_BASE, "I2S BCK", PICO_AUDIO_I2S_CLOCK_PIN_BASE+1, "I2S LRCK"));
 #endif
@@ -87,6 +87,15 @@ int main(int argc, char **argv)
     gpio_set_dir(PICO_SMPS_MODE_PIN, GPIO_OUT);
     gpio_put(PICO_SMPS_MODE_PIN, 1);
 #endif
+#if PICO_DOOM_TUFTY_BADGER
+    // Enable peripheral power rail + turn on backlight early for visual feedback
+    gpio_init(41);
+    gpio_set_dir(41, GPIO_OUT);
+    gpio_put(41, 1);
+    gpio_init(26);
+    gpio_set_dir(26, GPIO_OUT);
+    gpio_put(26, 1);
+#endif
 #endif
 #if LIB_PICO_STDIO
     stdio_init_all();
@@ -120,4 +129,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-

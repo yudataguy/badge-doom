@@ -2,6 +2,12 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 cmake_minimum_required(VERSION 3.13)
 
+# Local board headers live in this repository, so register them before
+# importing the Pico SDK when the Tufty badge board is selected.
+if (PICO_BOARD STREQUAL "pimoroni_tufty2350")
+    list(APPEND PICO_BOARD_HEADER_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/boards")
+endif()
+
 # We use PICO_SDK_PATH being set as an indicator that we're doing a Pico BUILD
 if (PICO_SDK_PATH)
     include(pico_sdk_import.cmake)

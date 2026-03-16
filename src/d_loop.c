@@ -90,7 +90,11 @@ int gametic;
 // When set to true, a single tic is run each time TryRunTics() is called.
 // This is used for -timedemo mode.
 
+#if PICO_DOOM_TUFTY_BADGER
+boolean singletics = true;
+#else
 boolean singletics = false;
+#endif
 
 // Index of the local player.
 
@@ -702,10 +706,12 @@ void TryRunTics(void) {
                 local_playeringame[j] = set->cmds[j].ingame;
                 lplayer_count += local_playeringame[j];
             }
+            #if USE_PICO_NET
             if (net_client_connected && lplayer_count < 2) {
                 net_client_connected = false;
                 piconet_stop();
             }
+            #endif
 #endif
 
 //#define DUMP_TICS PICO_BUILD
