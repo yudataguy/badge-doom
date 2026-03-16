@@ -4,6 +4,10 @@ This fork runs the full shareware Doom (DOOM1.WAD) on the **GitHub Universe 2025
 [Pimoroni Tufty 2350](https://github.com/pimoroni/tufty2350) with an RP2350B processor, 16 MB flash, and a 320x240
 ST7789 LCD. Six buttons, no keyboard, no VGA, no audio — just Doom.
 
+![Doom running on the GitHub Universe 2025 badge](docs/badge_doom_demo.gif)
+
+*[Full video with sound](docs/badge_doom_demo.mp4)*
+
 Forked from [kilograham/rp2040-doom](https://github.com/kilograham/rp2040-doom), which is itself derived from
 [Chocolate Doom](https://github.com/chocolate-doom/chocolate-doom). The original RP2040 Doom blog post is
 [here](https://kilograham.github.io/rp2040-doom/).
