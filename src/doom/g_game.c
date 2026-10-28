@@ -1813,7 +1813,7 @@ void G_DoLoadGame (void) {
 }
  
 
-#if PICO_ON_DEVICE
+#if PICO_ON_DEVICE && !NO_USE_SAVE
 static boolean save_game_clear(int key) {
     if (key == key_menu_confirm) {
         uint32_t size;

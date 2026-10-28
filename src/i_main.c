@@ -32,6 +32,7 @@
 #if PICO_ON_DEVICE
 #include "hardware/clocks.h"
 #include "hardware/vreg.h"
+#include "hardware/watchdog.h"
 #endif
 #endif
 #if USE_PICO_NET
@@ -40,6 +41,9 @@
 #include "doomtype.h"
 #include "i_system.h"
 #include "m_argv.h"
+#if PICO_DOOM_BADGE_APP
+#include "badger_hw.h"
+#endif
 #if PICO_RP2350
 #include "hardware/structs/qmi.h"
 #endif
@@ -64,6 +68,22 @@ int main(int argc, char **argv)
     myargv = argv;
 #endif
 #if PICO_ON_DEVICE
+#if BADGER_2026
+    // GPIO8 is the PSRAM chip select, sharing the QSPI bus with flash. The
+    // runtime's IO/PADS reset leaves it isolated at its last level; drive it
+    // high before releasing the pad so the PSRAM can never be selected.
+    gpio_put(8, 1);
+    gpio_set_dir(8, GPIO_OUT);
+    gpio_pull_up(8);
+    gpio_set_function(8, GPIO_FUNC_SIO);
+#endif
+#if PICO_DOOM_BADGE_APP
+    // The MonaOS launcher arms the watchdog before chaining into us so that a
+    // failed launch still reboots to its menu. Keep it armed with a longer
+    // timeout, fed by the input poll every tic, so a crash or hang in Doom
+    // also lands back in the menu rather than needing a power cycle.
+    watchdog_enable(BADGER_WATCHDOG_MS, true);
+#endif
 #if PICO_RP2350
     uint clkdiv = 3;
     uint rxdelay = 2;

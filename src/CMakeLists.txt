@@ -661,5 +661,49 @@ if (PICO_SDK)
                 PICO_BADGER_NO_AUDIO=1
                 TINY_WAD_ADDR=0x10040000
         )
+
+        # GitHub Universe 2026 badge, packaged as a MonaOS launcher app in build/badge-app/doom
+        # by the doom_badge2026_app_package target
+        set(BADGE2026_WAD_ADDR 0x10040000)
+        add_doom_tiny_target(doom_badge2026_app render_newhope pico_backend_badger_scaffold)
+        target_link_libraries(doom_badge2026_app PRIVATE tiny_settings)
+        target_compile_definitions(doom_badge2026_app PRIVATE
+                PICO_DOOM_TUFTY_BADGER=1
+                PICO_BADGER_NO_AUDIO=1
+                BADGER_2026=1
+                PICO_DOOM_BADGE_APP=1
+                # Flash belongs to MonaOS, and this image is remapped so flash write offsets would land in its firmware
+                NO_USE_SAVE=1
+                NO_USE_LOAD=1
+                TINY_WAD_ADDR=${BADGE2026_WAD_ADDR}
+        )
+        # GPIO0/1 drive case LEDs on this badge, not a UART
+        pico_enable_stdio_uart(doom_badge2026_app 0)
+
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        set(BADGE2026_APP_DIR ${CMAKE_BINARY_DIR}/badge-app/doom)
+        # make_badge_app.py copies every file in badge-app/doom alongside doom.bin
+        file(GLOB BADGE2026_LAUNCHER_FILES LIST_DIRECTORIES false CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/badge-app/doom/*)
+        set(BADGE2026_LAUNCHER_OUTPUTS)
+        foreach(launcher_file ${BADGE2026_LAUNCHER_FILES})
+            get_filename_component(launcher_name ${launcher_file} NAME)
+            list(APPEND BADGE2026_LAUNCHER_OUTPUTS ${BADGE2026_APP_DIR}/${launcher_name})
+        endforeach()
+        add_custom_command(
+                OUTPUT ${BADGE2026_APP_DIR}/doom.bin ${BADGE2026_LAUNCHER_OUTPUTS}
+                COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/make_badge_app.py
+                        $<TARGET_FILE_DIR:doom_badge2026_app>/doom_badge2026_app.bin
+                        ${CMAKE_SOURCE_DIR}/doom1.whx
+                        ${BADGE2026_WAD_ADDR}
+                        ${BADGE2026_APP_DIR}
+                DEPENDS doom_badge2026_app
+                        ${CMAKE_SOURCE_DIR}/make_badge_app.py
+                        ${CMAKE_SOURCE_DIR}/doom1.whx
+                        ${BADGE2026_LAUNCHER_FILES}
+                COMMENT "Packaging MonaOS app in ${BADGE2026_APP_DIR}"
+        )
+        add_custom_target(doom_badge2026_app_package ALL
+                DEPENDS ${BADGE2026_APP_DIR}/doom.bin
+        )
     endif()
 endif()

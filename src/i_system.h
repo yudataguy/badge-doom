@@ -60,6 +60,10 @@ extern uint8_t *exit_screen_kb_buffer_80;
 
 #if !NO_IERROR || !PICO_ON_DEVICE
 void I_Error (const char *error, ...) NORETURN PRINTF_ATTR(1, 2);
+#elif PICO_DOOM_BADGE_APP
+// No debugger on the badge: bail out to the MonaOS launcher instead.
+void badger_return_to_launcher(void) NORETURN;
+#define I_Error(args...) badger_return_to_launcher()
 #else
 #include "pico.h"
 //#define I_Error(args...) ((void)0)
