@@ -13,14 +13,13 @@
 #include "doomtype.h"
 #include "i_input.h"
 #include "m_config.h"
+#include "badger_hw.h"
 
 #if PICO_DOOM_BADGE_APP
 #include "pico/time.h"
 
 // Hold HOME this long to leave Doom and return to the MonaOS launcher.
 #define BADGER_HOME_EXIT_HOLD_US 1000000u
-
-void badger_return_to_launcher(void);
 
 static boolean home_armed;
 static boolean home_down;

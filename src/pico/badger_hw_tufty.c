@@ -16,7 +16,9 @@
 #include "hardware/pio.h"
 #include "hardware/vreg.h"
 #include "hardware/watchdog.h"
+#include "pico/multicore.h"
 #include "st7789_parallel.pio.h"
+#include "badger_hw.h"
 
 #define BADGER_BUTTON_UP_BIT    (1u << 0)
 #define BADGER_BUTTON_DOWN_BIT  (1u << 1)
@@ -376,10 +378,19 @@ void badger_lcd_present_565(const uint16_t *framebuffer, int width, int height)
 // Hand the badge back to MonaOS. A plain watchdog reboot (as machine.reset()
 // does) restarts the MicroPython firmware at the start of flash, and its
 // main.py sees WAKE_WATCHDOG and goes straight to the launcher menu.
-void __attribute__((noreturn)) badger_return_to_launcher(void)
+void badger_return_to_launcher(void)
 {
     tufty_buttons_init_once();
     gpio_put(TUFTY_LCD_BACKLIGHT_PIN, 0);
+
+    // Stop core 1 so no new LCD transfer starts, then finish any in flight
+    // and end the transaction, leaving the ST7789 idle for MonaOS.
+    multicore_reset_core1();
+    if (tufty_display_initialized)
+    {
+        tufty_wait_for_dma();
+        gpio_put(TUFTY_LCD_CS_PIN, 1);
+    }
 
     // The regulator lives in POWMAN and survives a watchdog reboot, so undo
     // main()'s overvolt (slowing down first) rather than leave MonaOS at 1.30 V.
@@ -392,7 +403,8 @@ void __attribute__((noreturn)) badger_return_to_launcher(void)
     {
         tight_loop_contents();
     }
-    sleep_ms(20);
+    // Debounce; busy-wait since core 1 may have died holding a timer lock.
+    busy_wait_ms(20);
 
     watchdog_reboot(0, SRAM_END, 0);
     while (true)

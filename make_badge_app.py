@@ -14,8 +14,8 @@ import sys
 XIP_BASE = 0x10000000
 SECTOR = 4096
 PICOBIN_BLOCK_MARKER_START = 0xffffded3
+# Every file in this folder ships with the app (CMake globs the same folder).
 LAUNCHER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'badge-app', 'doom')
-LAUNCHER_FILES = ('__init__.py', 'icon.png', 'README.md')
 
 
 def has_image_def(image):
@@ -50,8 +50,10 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, 'doom.bin'), 'wb') as f:
         f.write(image)
-    for name in LAUNCHER_FILES:
-        shutil.copyfile(os.path.join(LAUNCHER_DIR, name), os.path.join(out_dir, name))
+    for name in sorted(os.listdir(LAUNCHER_DIR)):
+        src = os.path.join(LAUNCHER_DIR, name)
+        if os.path.isfile(src):
+            shutil.copyfile(src, os.path.join(out_dir, name))
 
     print(f"Program:    {len(program)} bytes")
     print(f"WAD:        {len(wad)} bytes at 0x{wad_offset:x}")

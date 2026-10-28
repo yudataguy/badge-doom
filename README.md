@@ -98,10 +98,10 @@ the app says it is fragmented, delete it and copy it again after freeing some sp
 1. `/system` is a FAT volume with 4 KiB sectors at a fixed flash address (`0x10300000`). The launcher finds the
    4 KiB aligned flash address of `doom.bin`. It CRC-checks that region against the file, which proves the copy
    is contiguous.
-2. It disables MonaOS's interrupts, SysTick and watchdog, parks core 1, and drops off USB. It then calls the
-   bootrom's `chain_image()` from MicroPython inline assembly. The workarea is SCRATCH_X, which in the SDK memory
-   map holds only core 1's stack. The bootrom invalidates the XIP cache, so the assembly first writes back dirty
-   PSRAM lines; MonaOS's heap lives in PSRAM.
+2. It disables MonaOS's interrupts, SysTick and watchdog, parks core 1, and holds DMA, PIO and USB in reset. It
+   then calls the bootrom's `chain_image()` from MicroPython inline assembly. The workarea is SCRATCH_X, which in
+   the SDK memory map holds only core 1's stack. The bootrom invalidates the XIP cache, so the assembly first
+   writes back dirty PSRAM lines; MonaOS's heap lives in PSRAM.
 3. The bootrom verifies Doom's `IMAGE_DEF` and maps the file to `0x10000000` with QMI address translation. It
    then starts Doom as if it had been flashed there, so the WAD appears at `0x10040000` as usual.
 4. Holding HOME, or choosing **Quit Game**, puts the core voltage back to its default and does a watchdog

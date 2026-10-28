@@ -20,6 +20,9 @@
 #include "pico/stdio.h"
 #if PICO_ON_DEVICE
 #include "hardware/watchdog.h"
+#if PICO_DOOM_BADGE_APP
+#include "badger_hw.h"
+#endif
 #include "doomtype.h"
 #include "doom/p_saveg.h"
 #endif
@@ -468,7 +471,6 @@ void __attribute((noreturn)) I_Quit (void)
 {
 #if PICO_DOOM_BADGE_APP
     // There is no DOS prompt to drop to on the badge; go back to MonaOS.
-    extern void __attribute__((noreturn)) badger_return_to_launcher(void);
     badger_return_to_launcher();
 #endif
     extern void D_Endoom();

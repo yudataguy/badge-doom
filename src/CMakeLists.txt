@@ -659,9 +659,6 @@ if (PICO_SDK)
         target_compile_definitions(doom_tufty_badger_scaffold PRIVATE
                 PICO_DOOM_TUFTY_BADGER=1
                 PICO_BADGER_NO_AUDIO=1
-                # Current pico-extras refuse to build pico_audio headers on RP2350 without
-                # picking spin locks; nothing uses them since the badge has no audio
-                PICO_AUDIO_RP2350_OVERLAY_SDK_SPINLOCKS=1
                 TINY_WAD_ADDR=0x10040000
         )
 
@@ -673,7 +670,6 @@ if (PICO_SDK)
         target_compile_definitions(doom_badge2026_app PRIVATE
                 PICO_DOOM_TUFTY_BADGER=1
                 PICO_BADGER_NO_AUDIO=1
-                PICO_AUDIO_RP2350_OVERLAY_SDK_SPINLOCKS=1 # as above
                 BADGER_2026=1
                 PICO_DOOM_BADGE_APP=1
                 TINY_WAD_ADDR=${BADGE2026_WAD_ADDR}
@@ -683,16 +679,15 @@ if (PICO_SDK)
 
         find_package(Python3 REQUIRED COMPONENTS Interpreter)
         set(BADGE2026_APP_DIR ${CMAKE_BINARY_DIR}/badge-app/doom)
-        set(BADGE2026_LAUNCHER_FILES
-                ${CMAKE_SOURCE_DIR}/badge-app/doom/__init__.py
-                ${CMAKE_SOURCE_DIR}/badge-app/doom/icon.png
-                ${CMAKE_SOURCE_DIR}/badge-app/doom/README.md
-        )
+        # make_badge_app.py copies every file in badge-app/doom alongside doom.bin
+        file(GLOB BADGE2026_LAUNCHER_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/badge-app/doom/*)
+        set(BADGE2026_LAUNCHER_OUTPUTS)
+        foreach(launcher_file ${BADGE2026_LAUNCHER_FILES})
+            get_filename_component(launcher_name ${launcher_file} NAME)
+            list(APPEND BADGE2026_LAUNCHER_OUTPUTS ${BADGE2026_APP_DIR}/${launcher_name})
+        endforeach()
         add_custom_command(
-                OUTPUT ${BADGE2026_APP_DIR}/doom.bin
-                       ${BADGE2026_APP_DIR}/__init__.py
-                       ${BADGE2026_APP_DIR}/icon.png
-                       ${BADGE2026_APP_DIR}/README.md
+                OUTPUT ${BADGE2026_APP_DIR}/doom.bin ${BADGE2026_LAUNCHER_OUTPUTS}
                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/make_badge_app.py
                         $<TARGET_FILE_DIR:doom_badge2026_app>/doom_badge2026_app.bin
                         ${CMAKE_SOURCE_DIR}/doom1.whx

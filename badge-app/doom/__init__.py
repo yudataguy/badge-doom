@@ -10,7 +10,6 @@
 
 import binascii
 import os
-import sys
 import time
 
 import machine
@@ -18,11 +17,13 @@ import micropython
 import uctypes
 from array import array
 
-APP_DIR = __file__.rsplit("/", 1)[0] if "/" in __file__ else os.getcwd()
-os.chdir(APP_DIR)
-sys.path.insert(0, APP_DIR)
-
-IMAGE_FILE = "doom.bin"
+# The launcher imports apps as packages and chdirs into them first, so either
+# source gives the app's own folder; doom.bin is opened by absolute path.
+if __file__.startswith("/") and __file__.endswith("/__init__.py"):
+    APP_DIR = __file__[: -len("/__init__.py")]
+else:
+    APP_DIR = os.getcwd()
+IMAGE_PATH = APP_DIR + "/doom.bin"
 
 # /system is a FAT volume on 4 KiB sectors at a fixed flash offset (see
 # pimoroni/tufty2350 board/filesystem.cmake and modules/python/_msc.py).
@@ -42,6 +43,8 @@ PSM_FRCE_OFF_PROC1 = 0x01000000
 PSM_WDSEL = 0x40018008
 PSM_WDSEL_ALL_BUT_OSCS = 0x01FFFFF3  # as the SDK's _watchdog_enable()
 RESETS_RESET = 0x40020000
+RESETS_DMA = 0x00000004
+RESETS_PIO0_1_2 = 0x00003800
 RESETS_USBCTRL = 0x10000000
 WATCHDOG_CTRL = 0x400D8000
 WATCHDOG_CTRL_ENABLE = 0x40000000
@@ -55,8 +58,10 @@ ROM_FUNC_CHAIN_IMAGE = ord("C") | (ord("I") << 8)
 
 # chain_image() needs a 3264 byte workarea in SRAM (see _chain). SCRATCH_X
 # only holds core 1's stack in the SDK memory map, and core 1 is stopped.
+# Core 0's stack (SCRATCH_Y, just above) must leave chain_image() room to run.
 WORKAREA = 0x20080000
-WORKAREA_BYTES = 0x1000
+WORKAREA_BYTES = 0xD00
+ROM_STACK_HEADROOM = 0x800
 
 
 @micropython.asm_thumb
@@ -70,9 +75,9 @@ def _call2(r0, r1, r2):
 
 @micropython.asm_thumb
 def _chain(r0):
-    # r0 points at uint32 [chain_image, workarea, window_base, window_size].
-    # Calls chain_image(workarea, 4096, window_base, window_size), which only
-    # returns if the image cannot be launched; then reboots back to MonaOS.
+    # r0 points at uint32 [chain_image, workarea, workarea_size, window_base,
+    # window_size]. Calls chain_image() with the last four, which only returns
+    # if the image cannot be launched; then reboots back to MonaOS.
     mov(r5, r0)
 
     # MonaOS keeps its heap in PSRAM behind the XIP cache, and chain_image
@@ -95,9 +100,9 @@ def _chain(r0):
     # The workarea must be SRAM for the same reason.
     ldr(r4, [r5, 0])
     ldr(r0, [r5, 4])
-    movw(r1, 0x1000)
-    ldr(r2, [r5, 8])
-    ldr(r3, [r5, 12])
+    ldr(r1, [r5, 8])
+    ldr(r2, [r5, 12])
+    ldr(r3, [r5, 16])
     data(2, 0x47A0)  # blx r4
 
     # Launch failed: watchdog reboot to the launcher, as machine.reset() does
@@ -155,13 +160,15 @@ def find_image(path):
         head = f.read(SECTOR)
     head8 = head[:8]
     head_crc = binascii.crc32(head)
-    crc = file_crc(path)
+    crc = None  # whole-file CRC, only read once a candidate turns up
 
     for addr in range(FAT_XIP_BASE, FAT_XIP_BASE + FAT_BYTES - size + 1, SECTOR):
         if uctypes.bytearray_at(addr, 8) != head8:
             continue
         if binascii.crc32(uctypes.bytearray_at(addr, SECTOR)) != head_crc:
             continue
+        if crc is None:
+            crc = file_crc(path)
         if binascii.crc32(uctypes.bytearray_at(addr, size)) == crc:
             return addr, size
     return None, "fragmented"
@@ -184,8 +191,11 @@ def quiesce():
     while not mem32[PSM_FRCE_OFF] & PSM_FRCE_OFF_PROC1:
         pass
     mem32[PSM_FRCE_OFF + REG_ALIAS_CLR] = PSM_FRCE_OFF_PROC1
-    # Drop off USB so the host sees a clean disconnect.
-    mem32[RESETS_RESET + REG_ALIAS_SET] = RESETS_USBCTRL
+    # Stop MonaOS's DMA and PIO (display, wireless, LEDs) so nothing keeps
+    # writing SRAM while chain_image() and Doom's crt0 use it, and drop off
+    # USB so the host sees a clean disconnect. Doom's runtime takes them out
+    # of reset again.
+    mem32[RESETS_RESET + REG_ALIAS_SET] = RESETS_DMA | RESETS_PIO0_1_2 | RESETS_USBCTRL
     # Release the bootrom lock-checking lock, as rom_chain_image() does.
     mem32[BOOTRAM_BOOTLOCK7] = 0
 
@@ -195,9 +205,10 @@ def chain(addr, size):
     chain_image = _call2(lookup, ROM_FUNC_CHAIN_IMAGE, RT_FLAG_FUNC_ARM_SEC)
     if not chain_image:
         return "no chain_image in ROM"
-    if WORKAREA <= _sp() <= WORKAREA + WORKAREA_BYTES + 512:
-        return "stack in SCRATCH_X"
-    args = array("I", [chain_image, WORKAREA, addr, size])
+    sp = _sp()
+    if WORKAREA <= sp < WORKAREA + WORKAREA_BYTES + ROM_STACK_HEADROOM:
+        return "stack too close to workarea"
+    args = array("I", [chain_image, WORKAREA, WORKAREA_BYTES, addr, size])
     quiesce()
     _chain(uctypes.addressof(args))  # does not return
 
@@ -213,11 +224,11 @@ def fail(lines):
 
 def main():
     show(["DOOM", "Loading..."])
-    if not file_exists(IMAGE_FILE):
-        fail(["doom.bin is missing", "Copy it into", APP_DIR[len("/system"):]])
+    if not file_exists(IMAGE_PATH):
+        fail(["doom.bin is missing", "Copy it into", "apps/" + APP_DIR.rsplit("/", 1)[-1]])
         return
 
-    addr, size_or_reason = find_image(IMAGE_FILE)
+    addr, size_or_reason = find_image(IMAGE_PATH)
     if size_or_reason == "incomplete":
         fail(["doom.bin is incomplete", "Rebuild or download", "it, then copy again"])
         return
