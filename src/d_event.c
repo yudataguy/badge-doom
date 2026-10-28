@@ -25,6 +25,9 @@
 
 #if !DOOM_SMALL
 #define MAXEVENTS 64
+#elif PICO_DOOM_TUFTY_BADGER
+// One badge poll can post 8 events (four direction edges, Select, HOME tap)
+#define MAXEVENTS 16
 #else
 #define MAXEVENTS 8
 #endif
@@ -39,8 +42,15 @@ static int eventtail;
 //
 void D_PostEvent (event_t* ev)
 {
+    int next = (eventhead + 1) % MAXEVENTS;
+
+    // Drop the event if the queue is full; wrapping onto the tail would
+    // make the queue look empty and lose everything in it.
+    if (next == eventtail)
+        return;
+
     events[eventhead] = *ev;
-    eventhead = (eventhead + 1) % MAXEVENTS;
+    eventhead = next;
 }
 
 // Read an event from the queue.

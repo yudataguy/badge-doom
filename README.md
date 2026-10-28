@@ -105,7 +105,8 @@ the app says it is fragmented, delete it and copy it again after freeing some sp
 3. The bootrom verifies Doom's `IMAGE_DEF` and maps the file to `0x10000000` with QMI address translation. It
    then starts Doom as if it had been flashed there, so the WAD appears at `0x10040000` as usual.
 4. Holding HOME, or choosing **Quit Game**, puts the core voltage back to its default and does a watchdog
-   reboot. MonaOS boots normally, sees `WAKE_WATCHDOG`, and opens the launcher.
+   reboot. MonaOS boots normally, sees `WAKE_WATCHDOG`, and opens the launcher. A fatal error (`I_Error`), or
+   the launcher's watchdog expiring after a failed launch or a hang, ends up in the same place.
 
 The `doom_badge2026_app` target differs from the 2025 build in a few ways:
 
@@ -113,7 +114,8 @@ The `doom_badge2026_app` target differs from the 2025 build in a few ways:
 |--------|-----|
 | Buttons B/C/UP on GPIO 9/10/11, GPIO 8 held high (`BADGER_2026`) | GPIO 8 is PSRAM chip select on the 2026 board |
 | HOME tap = Doom menu, hold 1 s = back to MonaOS (`PICO_DOOM_BADGE_APP`) | The launcher owns HOME |
-| Save games disabled | Only Doom's own file is mapped; the end of flash is MonaOS's LittleFS |
+| Save/Load removed (`NO_USE_SAVE`, `NO_USE_LOAD`) | Flash belongs to MonaOS, and flash writes would hit its firmware through the remapping |
+| Watchdog armed by the launcher, fed every tic | A failed launch, a crash or a hang reboots to the MonaOS menu |
 | No UART stdio | GPIO 0/1 drive the case LEDs |
 
 The capacitive touch pads (CAP1208) are not used yet; all controls are on the five physical buttons and HOME.

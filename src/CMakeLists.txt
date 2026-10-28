@@ -672,6 +672,9 @@ if (PICO_SDK)
                 PICO_BADGER_NO_AUDIO=1
                 BADGER_2026=1
                 PICO_DOOM_BADGE_APP=1
+                # Flash belongs to MonaOS, and this image is remapped so flash write offsets would land in its firmware
+                NO_USE_SAVE=1
+                NO_USE_LOAD=1
                 TINY_WAD_ADDR=${BADGE2026_WAD_ADDR}
         )
         # GPIO0/1 drive case LEDs on this badge, not a UART
@@ -680,7 +683,7 @@ if (PICO_SDK)
         find_package(Python3 REQUIRED COMPONENTS Interpreter)
         set(BADGE2026_APP_DIR ${CMAKE_BINARY_DIR}/badge-app/doom)
         # make_badge_app.py copies every file in badge-app/doom alongside doom.bin
-        file(GLOB BADGE2026_LAUNCHER_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/badge-app/doom/*)
+        file(GLOB BADGE2026_LAUNCHER_FILES LIST_DIRECTORIES false CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/badge-app/doom/*)
         set(BADGE2026_LAUNCHER_OUTPUTS)
         foreach(launcher_file ${BADGE2026_LAUNCHER_FILES})
             get_filename_component(launcher_name ${launcher_file} NAME)

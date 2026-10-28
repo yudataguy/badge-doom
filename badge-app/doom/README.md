@@ -15,9 +15,9 @@ build stored alongside it in `doom.bin`; MonaOS comes back when you leave.
 | HOME (tap) | Open the Doom menu | Close the menu, or answer "no" |
 | HOME (hold 1 s) | Return to the badge launcher | Return to the badge launcher |
 
-Choosing **Quit Game** in the Doom menu also returns to the launcher. The
-capacitive touch pads are not used, and save games are disabled because the
-badge's flash belongs to MonaOS.
+Choosing **Quit Game** in the Doom menu also returns to the launcher, as does
+any crash. The capacitive touch pads are not used, and there is no Save or
+Load because the badge's flash belongs to MonaOS.
 
 ## Installing
 

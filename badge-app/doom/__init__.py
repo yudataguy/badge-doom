@@ -48,6 +48,9 @@ RESETS_PIO0_1_2 = 0x00003800
 RESETS_USBCTRL = 0x10000000
 WATCHDOG_CTRL = 0x400D8000
 WATCHDOG_CTRL_ENABLE = 0x40000000
+WATCHDOG_LOAD = 0x400D8004
+WATCHDOG_SCRATCH4 = 0x400D801C
+LAUNCH_TIMEOUT_US = 4000000  # Doom disarms the watchdog first thing in main()
 BOOTRAM_BOOTLOCK7 = 0x400E0828  # BOOTROM_LOCK_ENABLE
 REG_ALIAS_SET = 0x2000
 REG_ALIAS_CLR = 0x3000
@@ -198,6 +201,12 @@ def quiesce():
     mem32[RESETS_RESET + REG_ALIAS_SET] = RESETS_DMA | RESETS_PIO0_1_2 | RESETS_USBCTRL
     # Release the bootrom lock-checking lock, as rom_chain_image() does.
     mem32[BOOTRAM_BOOTLOCK7] = 0
+    # Arm the watchdog last: if the launch fails in a way the fallback in
+    # _chain() cannot handle (a fault, a hang), the badge still reboots to
+    # the launcher. Scratch 4 = 0 makes that a normal boot.
+    mem32[WATCHDOG_SCRATCH4] = 0
+    mem32[WATCHDOG_LOAD] = LAUNCH_TIMEOUT_US
+    mem32[WATCHDOG_CTRL + REG_ALIAS_SET] = WATCHDOG_CTRL_ENABLE
 
 
 def chain(addr, size):

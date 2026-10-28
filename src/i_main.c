@@ -32,6 +32,7 @@
 #if PICO_ON_DEVICE
 #include "hardware/clocks.h"
 #include "hardware/vreg.h"
+#include "hardware/watchdog.h"
 #endif
 #endif
 #if USE_PICO_NET
@@ -40,6 +41,9 @@
 #include "doomtype.h"
 #include "i_system.h"
 #include "m_argv.h"
+#if PICO_DOOM_BADGE_APP
+#include "badger_hw.h"
+#endif
 #if PICO_RP2350
 #include "hardware/structs/qmi.h"
 #endif
@@ -74,9 +78,11 @@ int main(int argc, char **argv)
     gpio_set_function(8, GPIO_FUNC_SIO);
 #endif
 #if PICO_DOOM_BADGE_APP
-    // Chain-loaded from MonaOS: put core 1 back in its bootrom wait loop so
-    // multicore_launch_core1() can start it later.
-    multicore_reset_core1();
+    // The MonaOS launcher arms the watchdog before chaining into us so that a
+    // failed launch still reboots to its menu. Keep it armed with a longer
+    // timeout, fed by the input poll every tic, so a crash or hang in Doom
+    // also lands back in the menu rather than needing a power cycle.
+    watchdog_enable(BADGER_WATCHDOG_MS, true);
 #endif
 #if PICO_RP2350
     uint clkdiv = 3;

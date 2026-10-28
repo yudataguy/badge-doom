@@ -16,6 +16,7 @@
 #include "badger_hw.h"
 
 #if PICO_DOOM_BADGE_APP
+#include "hardware/watchdog.h"
 #include "pico/time.h"
 
 // Hold HOME this long to leave Doom and return to the MonaOS launcher.
@@ -24,6 +25,15 @@
 static boolean home_armed;
 static boolean home_down;
 static uint32_t home_down_time_us;
+
+extern boolean menuactive;
+extern int messageToPrint;
+extern boolean messageNeedsInput;
+
+// Keys sent for the current Select press, so its release matches them even
+// if the menu state changed in between.
+static int select_keys[2];
+static int select_key_count;
 #endif
 
 float mouse_acceleration = 2.0f;
@@ -112,20 +122,55 @@ void I_GetEvent(void)
 {
     uint32_t current_buttons = badger_read_buttons();
 
+#if PICO_DOOM_BADGE_APP
+    watchdog_update();
+#endif
+
     // Tufty badge mapping:
     // A=left, B=right, C=fire/use/select, UP/DOWN=forward/back, HOME=escape.
     sync_button(current_buttons, BADGER_BUTTON_UP, KEY_UPARROW);
     sync_button(current_buttons, BADGER_BUTTON_DOWN, KEY_DOWNARROW);
     sync_button(current_buttons, BADGER_BUTTON_A, KEY_LEFTARROW);
     sync_button(current_buttons, BADGER_BUTTON_B, KEY_RIGHTARROW);
-    sync_button(current_buttons, BADGER_BUTTON_C, KEY_RCTRL);
 #if PICO_DOOM_BADGE_APP
-    // Answer "yes" to Y/N prompts (e.g. Quit Game) before ' ' dismisses them.
-    sync_button(current_buttons, BADGER_BUTTON_C, 'y');
-#endif
-    sync_button(current_buttons, BADGER_BUTTON_C, ' ');
-    sync_button(current_buttons, BADGER_BUTTON_C, KEY_ENTER);
-#if PICO_DOOM_BADGE_APP
+    // Select sends only what the current screen needs: "yes" to a Y/N prompt
+    // (e.g. Quit Game), Enter in menus, fire + use in game. One key per menu
+    // press means nothing trails into a menu that the first key opened.
+    if ((current_buttons ^ previous_buttons) & BADGER_BUTTON_C)
+    {
+        if (current_buttons & BADGER_BUTTON_C)
+        {
+            if (messageToPrint && messageNeedsInput)
+            {
+                select_keys[0] = 'y';
+                select_key_count = 1;
+            }
+            else if (menuactive)
+            {
+                select_keys[0] = KEY_ENTER;
+                select_key_count = 1;
+            }
+            else
+            {
+                select_keys[0] = KEY_RCTRL;
+                select_keys[1] = ' ';
+                select_key_count = 2;
+            }
+            for (int i = 0; i < select_key_count; ++i)
+            {
+                post_button_event(true, select_keys[i]);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < select_key_count; ++i)
+            {
+                post_button_event(false, select_keys[i]);
+            }
+            select_key_count = 0;
+        }
+    }
+
     // As a launcher app, HOME belongs to MonaOS: a tap opens the Doom menu
     // (sent on release), holding it returns to the badge launcher.
     if (!home_armed)
@@ -151,6 +196,9 @@ void I_GetEvent(void)
         post_button_event(false, KEY_ESCAPE);
     }
 #else
+    sync_button(current_buttons, BADGER_BUTTON_C, KEY_RCTRL);
+    sync_button(current_buttons, BADGER_BUTTON_C, ' ');
+    sync_button(current_buttons, BADGER_BUTTON_C, KEY_ENTER);
     sync_button(current_buttons, BADGER_BUTTON_HOME, KEY_ESCAPE);
 #endif
 
