@@ -64,6 +64,15 @@ int main(int argc, char **argv)
     myargv = argv;
 #endif
 #if PICO_ON_DEVICE
+#if BADGER_2026
+    // GPIO8 is the PSRAM chip select, sharing the QSPI bus with flash. The
+    // runtime's IO/PADS reset leaves it isolated at its last level; drive it
+    // high before releasing the pad so the PSRAM can never be selected.
+    gpio_put(8, 1);
+    gpio_set_dir(8, GPIO_OUT);
+    gpio_pull_up(8);
+    gpio_set_function(8, GPIO_FUNC_SIO);
+#endif
 #if PICO_DOOM_BADGE_APP
     // Chain-loaded from MonaOS: put core 1 back in its bootrom wait loop so
     // multicore_launch_core1() can start it later.

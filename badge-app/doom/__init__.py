@@ -18,7 +18,7 @@ import micropython
 import uctypes
 from array import array
 
-APP_DIR = "/system/apps/doom"
+APP_DIR = __file__.rsplit("/", 1)[0] if "/" in __file__ else os.getcwd()
 os.chdir(APP_DIR)
 sys.path.insert(0, APP_DIR)
 
@@ -39,6 +39,8 @@ ICSR_PENDSTCLR = 1 << 25
 ICSR_PENDSVCLR = 1 << 27
 PSM_FRCE_OFF = 0x40018004
 PSM_FRCE_OFF_PROC1 = 0x01000000
+PSM_WDSEL = 0x40018008
+PSM_WDSEL_ALL_BUT_OSCS = 0x01FFFFF3  # as the SDK's _watchdog_enable()
 RESETS_RESET = 0x40020000
 RESETS_USBCTRL = 0x10000000
 WATCHDOG_CTRL = 0x400D8000
@@ -50,6 +52,11 @@ REG_ALIAS_CLR = 0x3000
 BOOTROM_TABLE_LOOKUP = 0x16
 RT_FLAG_FUNC_ARM_SEC = 0x0004
 ROM_FUNC_CHAIN_IMAGE = ord("C") | (ord("I") << 8)
+
+# chain_image() needs a 3264 byte workarea in SRAM (see _chain). SCRATCH_X
+# only holds core 1's stack in the SDK memory map, and core 1 is stopped.
+WORKAREA = 0x20080000
+WORKAREA_BYTES = 0x1000
 
 
 @micropython.asm_thumb
@@ -63,7 +70,7 @@ def _call2(r0, r1, r2):
 
 @micropython.asm_thumb
 def _chain(r0):
-    # r0 points at uint32 [chain_image, window_base, window_size].
+    # r0 points at uint32 [chain_image, workarea, window_base, window_size].
     # Calls chain_image(workarea, 4096, window_base, window_size), which only
     # returns if the image cannot be launched; then reboots back to MonaOS.
     mov(r5, r0)
@@ -85,18 +92,16 @@ def _chain(r0):
     data(2, 0xF3BF, 0x8F4F)  # dsb sy
     data(2, 0xF3BF, 0x8F6F)  # isb sy
 
-    # The workarea must be SRAM for the same reason; use 8 KiB below our
-    # stack, which MonaOS will never need again.
-    data(2, 0x4668)  # mov r0, sp
-    movw(r1, 0x2000)
-    sub(r0, r0, r1)
-    movw(r1, 0x1000)
+    # The workarea must be SRAM for the same reason.
     ldr(r4, [r5, 0])
-    ldr(r2, [r5, 4])
-    ldr(r3, [r5, 8])
+    ldr(r0, [r5, 4])
+    movw(r1, 0x1000)
+    ldr(r2, [r5, 8])
+    ldr(r3, [r5, 12])
     data(2, 0x47A0)  # blx r4
 
-    # Launch failed: watchdog reboot to the launcher, as machine.reset() does.
+    # Launch failed: watchdog reboot to the launcher, as machine.reset() does
+    # (quiesce() already selected what the watchdog resets).
     movw(r1, 0x801C)
     movt(r1, 0x400D)  # WATCHDOG_SCRATCH4
     mov(r0, 0)
@@ -108,6 +113,11 @@ def _chain(r0):
     str(r0, [r1, 0])
     label(hang)
     b(hang)
+
+
+@micropython.asm_thumb
+def _sp():
+    data(2, 0x4668)  # mov r0, sp
 
 
 def show(lines):
@@ -137,10 +147,10 @@ def file_crc(path):
 
 def find_image(path):
     # Return the XIP address of a contiguous, 4 KiB aligned copy of the file
-    # within the FAT volume, or None if the file is fragmented.
+    # within the FAT volume, or None and the reason it cannot be used.
     size = os.stat(path)[6]
     if size == 0 or size % SECTOR:
-        return None, size
+        return None, "incomplete"
     with open(path, "rb") as f:
         head = f.read(SECTOR)
     head8 = head[:8]
@@ -154,7 +164,7 @@ def find_image(path):
             continue
         if binascii.crc32(uctypes.bytearray_at(addr, size)) == crc:
             return addr, size
-    return None, size
+    return None, "fragmented"
 
 
 def quiesce():
@@ -166,6 +176,8 @@ def quiesce():
         mem32[NVIC_ICPR0 + 4 * i] = 0xFFFFFFFF
     mem32[SCB_ICSR] = ICSR_PENDSTCLR | ICSR_PENDSVCLR
     mem32[WATCHDOG_CTRL + REG_ALIAS_CLR] = WATCHDOG_CTRL_ENABLE
+    # Let the fallback watchdog trigger in _chain() actually reset the chip.
+    mem32[PSM_WDSEL + REG_ALIAS_SET] = PSM_WDSEL_ALL_BUT_OSCS
     # Stop core 1 (it may be executing from flash, which is about to be
     # remapped) and let it restart into the bootrom's launch wait loop.
     mem32[PSM_FRCE_OFF + REG_ALIAS_SET] = PSM_FRCE_OFF_PROC1
@@ -183,7 +195,9 @@ def chain(addr, size):
     chain_image = _call2(lookup, ROM_FUNC_CHAIN_IMAGE, RT_FLAG_FUNC_ARM_SEC)
     if not chain_image:
         return "no chain_image in ROM"
-    args = array("I", [chain_image, addr, size])
+    if WORKAREA <= _sp() <= WORKAREA + WORKAREA_BYTES + 512:
+        return "stack in SCRATCH_X"
+    args = array("I", [chain_image, WORKAREA, addr, size])
     quiesce()
     _chain(uctypes.addressof(args))  # does not return
 
@@ -200,10 +214,13 @@ def fail(lines):
 def main():
     show(["DOOM", "Loading..."])
     if not file_exists(IMAGE_FILE):
-        fail(["doom.bin is missing", "Copy it into", "/apps/doom"])
+        fail(["doom.bin is missing", "Copy it into", APP_DIR[len("/system"):]])
         return
 
-    addr, size = find_image(IMAGE_FILE)
+    addr, size_or_reason = find_image(IMAGE_FILE)
+    if size_or_reason == "incomplete":
+        fail(["doom.bin is incomplete", "Rebuild or download", "it, then copy again"])
+        return
     if addr is None:
         fail(["doom.bin is fragmented", "Delete it, then copy", "it to the badge again"])
         return
@@ -215,7 +232,7 @@ def main():
     while not machine.Pin.board.BUTTON_HOME.value():
         pass
 
-    error = chain(addr, size)
+    error = chain(addr, size_or_reason)
     fail(["Could not start DOOM", error])
 
 

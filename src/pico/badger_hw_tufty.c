@@ -14,6 +14,7 @@
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/pio.h"
+#include "hardware/vreg.h"
 #include "hardware/watchdog.h"
 #include "st7789_parallel.pio.h"
 
@@ -378,12 +379,12 @@ void badger_lcd_present_565(const uint16_t *framebuffer, int width, int height)
 void __attribute__((noreturn)) badger_return_to_launcher(void)
 {
     tufty_buttons_init_once();
-
-    if (tufty_display_initialized)
-    {
-        tufty_wait_for_dma();
-    }
     gpio_put(TUFTY_LCD_BACKLIGHT_PIN, 0);
+
+    // The regulator lives in POWMAN and survives a watchdog reboot, so undo
+    // main()'s overvolt (slowing down first) rather than leave MonaOS at 1.30 V.
+    set_sys_clock_khz(150000, true);
+    vreg_set_voltage(VREG_VOLTAGE_DEFAULT);
 
     // HOME doubles as the USB boot switch; resetting while it is held would
     // drop into the ROM bootloader instead of MonaOS.
