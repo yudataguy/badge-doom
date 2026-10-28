@@ -64,6 +64,11 @@ int main(int argc, char **argv)
     myargv = argv;
 #endif
 #if PICO_ON_DEVICE
+#if PICO_DOOM_BADGE_APP
+    // Chain-loaded from MonaOS: put core 1 back in its bootrom wait loop so
+    // multicore_launch_core1() can start it later.
+    multicore_reset_core1();
+#endif
 #if PICO_RP2350
     uint clkdiv = 3;
     uint rxdelay = 2;

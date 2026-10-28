@@ -661,5 +661,26 @@ if (PICO_SDK)
                 PICO_BADGER_NO_AUDIO=1
                 TINY_WAD_ADDR=0x10040000
         )
+
+        # GitHub Universe 2026 badge, packaged as a MonaOS launcher app in build/badge-app/doom
+        add_doom_tiny_target(doom_badge2026_app render_newhope pico_backend_badger_scaffold)
+        target_link_libraries(doom_badge2026_app PRIVATE tiny_settings)
+        target_compile_definitions(doom_badge2026_app PRIVATE
+                PICO_DOOM_TUFTY_BADGER=1
+                PICO_BADGER_NO_AUDIO=1
+                BADGER_2026=1
+                PICO_DOOM_BADGE_APP=1
+                TINY_WAD_ADDR=0x10040000
+        )
+        # GPIO0/1 drive case LEDs on this badge, not a UART
+        pico_enable_stdio_uart(doom_badge2026_app 0)
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        add_custom_command(TARGET doom_badge2026_app POST_BUILD
+                COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/make_badge_app.py
+                        $<TARGET_FILE_DIR:doom_badge2026_app>/doom_badge2026_app.bin
+                        ${CMAKE_SOURCE_DIR}/doom1.whx
+                        ${CMAKE_BINARY_DIR}/badge-app/doom
+                COMMENT "Packaging MonaOS app in ${CMAKE_BINARY_DIR}/badge-app/doom"
+        )
     endif()
 endif()

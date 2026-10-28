@@ -14,6 +14,7 @@
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/pio.h"
+#include "hardware/watchdog.h"
 #include "st7789_parallel.pio.h"
 
 #define BADGER_BUTTON_UP_BIT    (1u << 0)
@@ -30,12 +31,22 @@
 #define TUFTY_LCD_RD_PIN        31
 #define TUFTY_LCD_D0_PIN        32
 
+#if BADGER_2026
+// Universe 2026 badge: GPIO8 is PSRAM chip select, so B/C/UP moved up one pin.
+#define TUFTY_BUTTON_DOWN_PIN   6
+#define TUFTY_BUTTON_A_PIN      7
+#define TUFTY_BUTTON_B_PIN      9
+#define TUFTY_BUTTON_C_PIN      10
+#define TUFTY_BUTTON_UP_PIN     11
+#define TUFTY_BUTTON_HOME_PIN   22
+#else
 #define TUFTY_BUTTON_DOWN_PIN   6
 #define TUFTY_BUTTON_A_PIN      7
 #define TUFTY_BUTTON_B_PIN      8
 #define TUFTY_BUTTON_C_PIN      9
 #define TUFTY_BUTTON_UP_PIN     10
 #define TUFTY_BUTTON_HOME_PIN   22
+#endif
 
 enum st7789_reg
 {
@@ -359,3 +370,33 @@ void badger_lcd_present_565(const uint16_t *framebuffer, int width, int height)
     tufty_wait_for_dma();
     gpio_put(TUFTY_LCD_CS_PIN, 1);
 }
+
+#if PICO_DOOM_BADGE_APP
+// Hand the badge back to MonaOS. A plain watchdog reboot (as machine.reset()
+// does) restarts the MicroPython firmware at the start of flash, and its
+// main.py sees WAKE_WATCHDOG and goes straight to the launcher menu.
+void __attribute__((noreturn)) badger_return_to_launcher(void)
+{
+    tufty_buttons_init_once();
+
+    if (tufty_display_initialized)
+    {
+        tufty_wait_for_dma();
+    }
+    gpio_put(TUFTY_LCD_BACKLIGHT_PIN, 0);
+
+    // HOME doubles as the USB boot switch; resetting while it is held would
+    // drop into the ROM bootloader instead of MonaOS.
+    while (!gpio_get(TUFTY_BUTTON_HOME_PIN))
+    {
+        tight_loop_contents();
+    }
+    sleep_ms(20);
+
+    watchdog_reboot(0, SRAM_END, 0);
+    while (true)
+    {
+        tight_loop_contents();
+    }
+}
+#endif

@@ -132,6 +132,10 @@ target_link_libraries(pico_backend_vga INTERFACE
 )
 
 add_library(pico_backend_badger_scaffold INTERFACE)
+target_compile_definitions(pico_backend_badger_scaffold INTERFACE
+        # newer pico-extras refuse to pick audio spin lock IDs on RP2350 without this; the badge has no audio
+        PICO_AUDIO_RP2350_OVERLAY_SDK_SPINLOCKS=1
+)
 target_link_libraries(pico_backend_badger_scaffold INTERFACE
         doom_badger_hw_tufty
         doom_input_badger_stub

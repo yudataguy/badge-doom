@@ -2645,6 +2645,12 @@ void P_UnArchiveSpecials (void)
 #include "picodoom.h"
 
 const uint8_t *get_end_of_flash(void) {
+#if PICO_DOOM_BADGE_APP
+    // Launched from MonaOS, only our own image is mapped into the XIP window
+    // and the physical end of flash holds the badge's LittleFS. Report no free
+    // space after the WAD so save games are refused rather than written there.
+    return whd_map_base + whdheader->size;
+#else
     static const uint8_t *end_of_flash;
     if (!end_of_flash) {
         // look for end of flash by repeated data
@@ -2656,6 +2662,7 @@ const uint8_t *get_end_of_flash(void) {
 //        printf("FLASH SPACE %p -> %p\n", whd_map_base + whdheader->size, end_of_flash);
     }
     return end_of_flash;
+#endif
 }
 
 void P_SaveGameGetExistingFlashSlotAddresses(flash_slot_info_t *slots, int count) {

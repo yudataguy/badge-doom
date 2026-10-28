@@ -65,6 +65,61 @@ cp doom_tufty_combined.uf2 /Volumes/RP2350/
 
 The badge reboots and Doom starts.
 
+## Universe 2026 Badge App
+
+The GitHub Universe 2026 badge runs MonaOS (MicroPython), and its launcher only lists MicroPython apps. Doom
+needs the whole RP2350, so it ships as a small launcher app (`badge-app/doom/`) plus `doom.bin`, the native Doom
+image with the WAD packed at offset `0x40000`. MonaOS stays on the badge untouched.
+
+> **Status:** builds and is checked offline, but has not yet been run on 2026 badge hardware.
+
+### Build the app
+
+Same prerequisites as above, then:
+
+```bash
+make doom_badge2026_app -j8
+```
+
+This writes a ready-to-copy app folder to `build-tufty/badge-app/doom/` (`__init__.py`, `icon.png`, `README.md`,
+`doom.bin`).
+
+### Install
+
+1. On the badge, launch **USB Disk** from the menu.
+2. Copy the `doom` folder into `apps/` on the `TUFTY` drive.
+3. Eject and reset. **DOOM** appears in the launcher.
+
+`doom.bin` (about 2 MB) has to land in one contiguous run of flash. On a fresh or lightly used badge it will; if
+the app says it is fragmented, delete it and copy it again after freeing some space.
+
+### How it works
+
+1. `/system` is a FAT volume with 4 KiB sectors at a fixed flash address (`0x10300000`). The launcher finds the
+   4 KiB aligned flash address of `doom.bin`. It CRC-checks that region against the file, which proves the copy
+   is contiguous.
+2. It disables MonaOS's interrupts, SysTick and watchdog, parks core 1, and drops off USB. It then calls the
+   bootrom's `chain_image()`, from MicroPython inline assembly, with a workarea in SRAM. The bootrom invalidates
+   the XIP cache, so the assembly first writes back dirty PSRAM lines; MonaOS's heap lives in PSRAM.
+3. The bootrom verifies Doom's `IMAGE_DEF` and maps the file to `0x10000000` with QMI address translation. It
+   then starts Doom as if it had been flashed there, so the WAD appears at `0x10040000` as usual.
+4. Holding HOME, or choosing **Quit Game**, does a watchdog reboot. MonaOS boots normally, sees `WAKE_WATCHDOG`,
+   and opens the launcher.
+
+The `doom_badge2026_app` target differs from the 2025 build in a few ways:
+
+| Change | Why |
+|--------|-----|
+| Buttons B/C/UP on GPIO 9/10/11 (`BADGER_2026`) | GPIO 8 is PSRAM chip select on the 2026 board |
+| HOME tap = Doom menu, hold 1 s = back to MonaOS (`PICO_DOOM_BADGE_APP`) | The launcher owns HOME |
+| Save games disabled | Only Doom's own file is mapped; the end of flash is MonaOS's LittleFS |
+| No UART stdio | GPIO 0/1 drive the case LEDs |
+
+The capacitive touch pads (CAP1208) are not used yet; all controls are on the five physical buttons and HOME.
+
+The 2026 button layout is Left, Right, Select along the bottom and Up, Down on the right edge. These map to A, B,
+C, UP and DOWN in the table below.
+
 ## Hardware
 
 ### Badge Specs

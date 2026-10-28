@@ -466,6 +466,11 @@ void handle_exit_key_down(int scancode, bool shift, uint8_t *kb_buffer, int kb_l
 uint8_t *exit_screen_kb_buffer_80;
 void __attribute((noreturn)) I_Quit (void)
 {
+#if PICO_DOOM_BADGE_APP
+    // There is no DOS prompt to drop to on the badge; go back to MonaOS.
+    extern void __attribute__((noreturn)) badger_return_to_launcher(void);
+    badger_return_to_launcher();
+#endif
     extern void D_Endoom();
 #if USE_PICO_NET
     piconet_stop();

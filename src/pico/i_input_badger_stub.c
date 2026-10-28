@@ -14,6 +14,19 @@
 #include "i_input.h"
 #include "m_config.h"
 
+#if PICO_DOOM_BADGE_APP
+#include "pico/time.h"
+
+// Hold HOME this long to leave Doom and return to the MonaOS launcher.
+#define BADGER_HOME_EXIT_HOLD_US 1000000u
+
+void badger_return_to_launcher(void);
+
+static boolean home_armed;
+static boolean home_down;
+static uint32_t home_down_time_us;
+#endif
+
 float mouse_acceleration = 2.0f;
 int mouse_threshold = 10;
 int novert = 0;
@@ -89,6 +102,11 @@ void I_StopTextInput(void)
 void I_InputInit(void)
 {
     previous_buttons = badger_read_buttons();
+#if PICO_DOOM_BADGE_APP
+    // Ignore a HOME press carried over from the launcher until it is released.
+    home_armed = false;
+    home_down = false;
+#endif
 }
 
 void I_GetEvent(void)
@@ -102,9 +120,40 @@ void I_GetEvent(void)
     sync_button(current_buttons, BADGER_BUTTON_A, KEY_LEFTARROW);
     sync_button(current_buttons, BADGER_BUTTON_B, KEY_RIGHTARROW);
     sync_button(current_buttons, BADGER_BUTTON_C, KEY_RCTRL);
+#if PICO_DOOM_BADGE_APP
+    // Answer "yes" to Y/N prompts (e.g. Quit Game) before ' ' dismisses them.
+    sync_button(current_buttons, BADGER_BUTTON_C, 'y');
+#endif
     sync_button(current_buttons, BADGER_BUTTON_C, ' ');
     sync_button(current_buttons, BADGER_BUTTON_C, KEY_ENTER);
+#if PICO_DOOM_BADGE_APP
+    // As a launcher app, HOME belongs to MonaOS: a tap opens the Doom menu
+    // (sent on release), holding it returns to the badge launcher.
+    if (!home_armed)
+    {
+        home_armed = (current_buttons & BADGER_BUTTON_HOME) == 0;
+    }
+    else if (current_buttons & BADGER_BUTTON_HOME)
+    {
+        if (!home_down)
+        {
+            home_down = true;
+            home_down_time_us = time_us_32();
+        }
+        else if (time_us_32() - home_down_time_us >= BADGER_HOME_EXIT_HOLD_US)
+        {
+            badger_return_to_launcher();
+        }
+    }
+    else if (home_down)
+    {
+        home_down = false;
+        post_button_event(true, KEY_ESCAPE);
+        post_button_event(false, KEY_ESCAPE);
+    }
+#else
     sync_button(current_buttons, BADGER_BUTTON_HOME, KEY_ESCAPE);
+#endif
 
     previous_buttons = current_buttons;
 }
